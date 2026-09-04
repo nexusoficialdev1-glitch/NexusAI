@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api"; 
+const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
  
  
  const loginForm =
