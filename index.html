@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NexusAI — Acceso</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="shortcut icon" href="img/icon.png" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+>
+</head>
+
+<body>
+
+    <main class="page">
+
+        <!-- BRAND -->
+
+        <a href="#" class="brand">
+
+            <span class="brand-name">
+                NexusAI
+            </span>
+
+        </a>
+
+
+        <!-- AUTH CARD -->
+
+        <section class="auth-card">
+
+
+            <!-- =========================
+                 LOGIN
+            ========================== -->
+
+            <form
+                class="auth-form active"
+                id="loginForm"
+            >
+
+                <div class="auth-header">
+
+                    <h1>
+                        Iniciar sesión
+                    </h1>
+
+                    <p>
+                        Accede a tu cuenta de NexusAI.
+                    </p>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="loginEmail">
+                        Correo electrónico
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="email"
+                            id="loginEmail"
+                            placeholder="nombre@ejemplo.com"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="loginPassword">
+                        Contraseña
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="password"
+                            id="loginPassword"
+                            class="password-input"
+                            placeholder="Introduce tu contraseña"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            onclick="togglePassword('loginPassword', this)"
+                            aria-label="Mostrar contraseña"
+                        >
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-row">
+
+                    <label class="checkbox">
+
+                        <input
+                            type="checkbox"
+                            id="remember"
+                        >
+
+                        <span>
+                            Recordarme
+                        </span>
+
+                    </label>
+
+
+                    <button
+                        type="button"
+                        class="link-button"
+                        onclick="forgotPassword()"
+                    >
+                        ¿Olvidaste tu contraseña?
+                    </button>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="primary-button"
+                    id="loginButton"
+                >
+                    Iniciar sesión
+                </button>
+
+
+                <div class="divider">
+                    O CONTINÚA CON
+                </div>
+
+
+                <div class="social-buttons">
+
+                    <button
+                    type="button"
+                    class="social-button"
+                    onclick="socialLogin('google')">
+                    <i class="fa-brands fa-google"></i>
+                    Continuar con Google
+                    </button>
+
+                    <button
+                    type="button"
+                    class="social-button"
+                    onclick="socialLogin('Github')">
+                    <i class="fa-brands fa-github"></i>
+                    Continuar con Github
+                    </button>
+
+                </div>
+
+
+                <div class="switch-auth">
+
+                    ¿No tienes una cuenta?
+
+                    <button
+                        type="button"
+                        onclick="showRegister()"
+                    >
+                        Crear cuenta
+                    </button>
+
+                </div>
+
+            </form>
+
+
+
+            <!-- =========================
+                 REGISTER
+            ========================== -->
+
+            <form
+                class="auth-form"
+                id="registerForm"
+            >
+
+                <div class="auth-header">
+
+                    <h1>
+                        Crear cuenta
+                    </h1>
+
+                    <p>
+                        Crea tu cuenta gratuita de NexusAI.
+                    </p>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="registerName">
+                        Nombre
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="text"
+                            id="registerName"
+                            placeholder="Tu nombre"
+                            autocomplete="name"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="registerEmail">
+                        Correo electrónico
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="email"
+                            id="registerEmail"
+                            placeholder="nombre@ejemplo.com"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="registerPassword">
+                        Contraseña
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="password"
+                            id="registerPassword"
+                            class="password-input"
+                            placeholder="Mínimo 8 caracteres"
+                            minlength="8"
+                            autocomplete="new-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            onclick="togglePassword('registerPassword', this)"
+                        >
+                             <i class="fa-regular fa-eye"></i>
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="field">
+
+                    <label for="confirmPassword">
+                        Confirmar contraseña
+                    </label>
+
+                    <div class="input-wrapper">
+
+                        <input
+                            type="password"
+                            id="confirmPassword"
+                            class="password-input"
+                            placeholder="Repite tu contraseña"
+                            minlength="8"
+                            autocomplete="new-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            onclick="togglePassword('confirmPassword', this)"
+                        >
+                             <i class="fa-regular fa-eye"></i>
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <label
+                    class="checkbox"
+                    style="margin-bottom: 18px;"
+                >
+
+                    <input
+                        type="checkbox"
+                        id="acceptTerms"
+                        required
+                    >
+
+                    <span>
+                        Acepto los términos y condiciones.
+                    </span>
+
+                </label>
+
+
+                <button
+                    type="submit"
+                    class="primary-button"
+                    id="registerButton"
+                >
+                    Crear cuenta
+                </button>
+
+
+                <div class="switch-auth">
+
+                    ¿Ya tienes una cuenta?
+
+                    <button
+                        type="button"
+                        onclick="showLogin()"
+                    >
+                        Iniciar sesión
+                    </button>
+
+                </div>
+
+
+                <div class="terms">
+
+                    Al crear una cuenta aceptas nuestros
+
+                    <a href="terms.html">
+                        Términos de servicio
+                    </a>
+
+                    y
+
+                    <a href="privacy.html">
+                        Política de privacidad
+                    </a>.
+
+                </div>
+
+            </form>
+
+        </section>
+
+
+        <footer class="page-footer">
+            © 2026 NexusAI
+        </footer>
+
+    </main>
+
+
+    <!-- TOAST -->
+
+    <div
+        class="toast"
+        id="toast"
+    >
+
+        <div class="toast-icon">
+            ✓
+        </div>
+
+        <span id="toastMessage"></span>
+
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>
