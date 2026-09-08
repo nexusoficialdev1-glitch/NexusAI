@@ -582,50 +582,51 @@ res.redirect(
 
 app.get("/api/auth/me", (req, res) => {
     try {
-        const token =
-            req.cookies.nexusai_token;
+        const token = req.cookies.nexusai_token;
 
-
+        // No llegó la cookie
         if (!token) {
+            console.log("❌ /auth/me: no llegó nexusai_token");
+
             return res.status(401).json({
                 success: false,
-                message: "No hay una sesión activa."
+                message: "No llegó la cookie de sesión."
             });
         }
 
+        console.log("✅ /auth/me: cookie recibida");
 
-        const decoded =
-            jwt.verify(
-                token,
-                JWT_SECRET
-            );
+        let decoded;
 
+        try {
+            decoded = jwt.verify(token, JWT_SECRET);
+        } catch (error) {
+            console.error("❌ JWT inválido:", error.message);
 
-        const user = db
-            .prepare(`
-                SELECT
-                    id,
-                    name,
-                    email,
-                    created_at
-                FROM users
-                WHERE id = ?
-            `)
-            .get(decoded.id);
+            return res.status(401).json({
+                success: false,
+                message: "Token inválido o expirado."
+            });
+        }
 
+        console.log("✅ JWT válido. User ID:", decoded.id);
+
+        const user = db.prepare(`
+            SELECT id, name, email, created_at
+            FROM users
+            WHERE id = ?
+        `).get(decoded.id);
 
         if (!user) {
-            res.clearCookie(
-                "nexusai_token"
-            );
+            console.error("❌ Usuario no encontrado:", decoded.id);
 
             return res.status(401).json({
                 success: false,
-                message:
-                    "La cuenta ya no existe."
+                message: "El usuario del token no existe."
             });
         }
 
+        console.log("✅ Usuario encontrado:", user.name, user.email);
 
         return res.json({
             success: true,
@@ -633,14 +634,11 @@ app.get("/api/auth/me", (req, res) => {
         });
 
     } catch (error) {
-        res.clearCookie(
-            "nexusai_token"
-        );
+        console.error("❌ ERROR /auth/me:", error);
 
-        return res.status(401).json({
+        return res.status(500).json({
             success: false,
-            message:
-                "La sesión ha expirado."
+            message: "Error interno verificando la sesión."
         });
     }
 });
