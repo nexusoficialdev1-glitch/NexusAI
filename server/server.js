@@ -54,17 +54,19 @@ app.use(express.json());
 
 app.use(cookieParser());
 
-app.use(
-    cors({
-        origin: [
-            "http://localhost:5500",
-            "http://127.0.0.1:5500"
-        ],
-        credentials: true
-    })
-);
+const corsOptions = {
+    origin: [
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "https://nexusai-platform-dev.netlify.app"
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+};
 
-app.use(passport.initialize());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 
 /* =========================================================
@@ -95,8 +97,8 @@ function createToken(user, remember = false) {
 function setAuthCookie(res, token, remember = false) {
     res.cookie("nexusai_token", token, {
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: true,
+        sameSite: "none",
         maxAge: (remember ? 30 : 7) * 24 * 60 * 60 * 1000
     });
 }
@@ -636,19 +638,15 @@ app.get("/api/auth/me", (req, res) => {
 ========================================================= */
 
 app.post("/api/auth/logout", (req, res) => {
-    res.clearCookie(
-        "nexusai_token",
-        {
-            httpOnly: true,
-            secure: false,
-            sameSite: "lax"
-        }
-    );
+    res.clearCookie("nexusai_token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none"
+    });
 
     return res.json({
         success: true,
-        message:
-            "Sesión cerrada correctamente."
+        message: "Sesión cerrada correctamente."
     });
 });
 

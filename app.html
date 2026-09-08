@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+
+    <title>NexusAI — Chat</title>
+
+    <link rel="icon" href="img/icon.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    >
+
+    <link rel="stylesheet" href="css/app.css">
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
+
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-top">
+
+            <!-- BRAND -->
+            <div class="brand">
+                <div class="brand-icon">
+                    <img src="img/icon.png" alt="NexusAI">
+                </div>
+
+                <span>
+                    Nexus<span>AI</span>
+                </span>
+            </div>
+
+
+            <!-- NUEVO CHAT -->
+            <button class="new-chat-btn" id="newChatBtn">
+                <i class="fa-solid fa-plus"></i>
+                <span>Nuevo chat</span>
+            </button>
+
+
+            <!-- BUSCAR CHATS -->
+            <button class="search-chats" id="searchToggle">
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <span>Buscar chats</span>
+
+                <kbd>Ctrl K</kbd>
+            </button>
+
+
+            <!-- BUSCADOR -->
+            <div class="search-box" id="searchBox">
+
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <input
+                    id="chatSearch"
+                    type="search"
+                    placeholder="Buscar conversaciones..."
+                    autocomplete="off"
+                >
+
+                <button
+                    id="closeSearch"
+                    aria-label="Cerrar búsqueda"
+                >
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             HISTORIAL
+        ================================================== -->
+
+        <div class="history-section">
+
+            <div class="history-heading">
+
+                <span>Historial</span>
+
+                <button
+                    id="clearHistoryBtn"
+                    title="Borrar todo"
+                    aria-label="Borrar todo el historial"
+                >
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+
+            </div>
+
+
+            <div
+                class="chat-list"
+                id="chatList"
+            ></div>
+
+
+            <div
+                class="empty-history"
+                id="emptyHistory"
+            >
+                <i class="fa-regular fa-comments"></i>
+
+                <p>No hay conversaciones</p>
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             SIDEBAR BOTTOM
+        ================================================== -->
+
+        <div class="sidebar-bottom">
+
+            <!-- APARIENCIA -->
+            <button
+                class="sidebar-action"
+                id="themeBtn"
+            >
+                <i class="fa-solid fa-moon"></i>
+
+                <span>Cambiar apariencia</span>
+            </button>
+
+
+            <!-- USUARIO -->
+            <div class="user-area">
+
+                <div
+                    class="user-avatar"
+                    id="userAvatar"
+                >
+                    N
+                </div>
+
+
+                <div class="user-info">
+
+                    <strong id="userName">
+                        Usuario
+                    </strong>
+
+                    <span id="userEmail">
+                        NexusAI
+                    </span>
+
+                </div>
+
+
+                <button
+                    class="user-more"
+                    aria-label="Más opciones"
+                >
+                    <i class="fa-solid fa-ellipsis"></i>
+                </button>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
+    <main class="main-content">
+
+
+        <!-- =================================================
+             MOBILE HEADER
+        ================================================== -->
+
+        <header class="mobile-header">
+
+            <button
+                id="menuBtn"
+                class="icon-btn"
+                aria-label="Abrir menú"
+            >
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+
+            <div class="mobile-brand">
+
+                <div class="brand-icon small">
+                    <img
+                        src="img/icon.png"
+                        alt="NexusAI"
+                    >
+                </div>
+
+                <strong>
+                    Nexus<span>AI</span>
+                </strong>
+
+            </div>
+
+
+            <button
+                id="mobileNewChat"
+                class="icon-btn"
+                aria-label="Nuevo chat"
+            >
+                <i class="fa-solid fa-plus"></i>
+            </button>
+
+        </header>
+
+
+
+        <!-- =================================================
+             CONVERSACIÓN
+        ================================================== -->
+
+        <section
+            class="conversation"
+            id="conversation"
+        >
+
+
+            <!-- =================================================
+                 WELCOME
+            ================================================== -->
+
+            <div
+                class="welcome"
+                id="welcome"
+            >
+
+                <div class="welcome-icon">
+
+                    <img
+                        src="img/icon.png"
+                        alt="NexusAI"
+                    >
+
+                </div>
+
+
+                <h1>
+                    ¿Qué quieres hacer hoy?
+                </h1>
+
+
+                <p>
+                    Habla con NexusAI. Pregunta, crea,
+                    organiza o simplemente conversa.
+                </p>
+
+
+                <!-- =================================================
+                     PROMPTS
+                ================================================== -->
+
+                <div class="prompt-grid">
+
+
+                    <button
+                        class="prompt-card"
+                        data-prompt="Dame una idea para una historia divertida"
+                    >
+
+                        <span class="prompt-icon">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        </span>
+
+                        <span>
+
+                            <strong>
+                                Crear algo
+                            </strong>
+
+                            <small>
+                                Dame una idea para una historia divertida
+                            </small>
+
+                        </span>
+
+                    </button>
+
+
+
+                    <button
+                        class="prompt-card"
+                        data-prompt="Ayúdame a organizar mi día"
+                    >
+
+                        <span class="prompt-icon">
+                            <i class="fa-regular fa-calendar"></i>
+                        </span>
+
+                        <span>
+
+                            <strong>
+                                Organizarme
+                            </strong>
+
+                            <small>
+                                Ayúdame a organizar mi día
+                            </small>
+
+                        </span>
+
+                    </button>
+
+
+
+                    <button
+                        class="prompt-card"
+                        data-prompt="Recomiéndame una película para ver"
+                    >
+
+                        <span class="prompt-icon">
+                            <i class="fa-solid fa-film"></i>
+                        </span>
+
+                        <span>
+
+                            <strong>
+                                Recomendarme
+                            </strong>
+
+                            <small>
+                                Recomiéndame una película para ver
+                            </small>
+
+                        </span>
+
+                    </button>
+
+
+
+                    <button
+                        class="prompt-card"
+                        data-prompt="Explícame algo interesante de forma sencilla"
+                    >
+
+                        <span class="prompt-icon">
+                            <i class="fa-regular fa-lightbulb"></i>
+                        </span>
+
+                        <span>
+
+                            <strong>
+                                Aprender
+                            </strong>
+
+                            <small>
+                                Explícame algo interesante de forma sencilla
+                            </small>
+
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 MENSAJES
+            ================================================== -->
+
+            <div
+                class="messages"
+                id="messages"
+            ></div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             COMPOSER
+        ================================================== -->
+
+        <div class="composer-wrap">
+
+
+            <!-- ARCHIVO ADJUNTO -->
+            <div
+                class="attachment-preview"
+                id="attachmentPreview"
+            ></div>
+
+
+            <!-- CAJA DE MENSAJE -->
+            <div
+                class="composer"
+                id="composer"
+            >
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    maxlength="8000"
+                    placeholder="Escribe un mensaje a NexusAI..."
+                    autocomplete="off"
+                ></textarea>
+
+
+                <div class="composer-bottom">
+
+
+                    <!-- HERRAMIENTAS -->
+                    <div class="composer-tools">
+
+                        <label
+                            class="tool-btn"
+                            title="Adjuntar archivo"
+                            aria-label="Adjuntar archivo"
+                        >
+
+                            <i class="fa-solid fa-paperclip"></i>
+
+                            <input
+                                type="file"
+                                id="fileInput"
+                                hidden
+                            >
+
+                        </label>
+
+                    </div>
+
+
+                    <!-- BOTÓN ENVIAR -->
+                    <button
+                        class="send-btn"
+                        id="sendBtn"
+                        disabled
+                        aria-label="Enviar mensaje"
+                        title="Enviar mensaje"
+                    >
+
+                        <i class="fa-solid fa-arrow-up"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 AVISO — FUERA DEL COMPOSER
+            ================================================== -->
+
+            <span class="composer-hint">
+                NexusAI puede cometer errores. Comprueba la información importante.
+            </span>
+
+        </div>
+
+    </main>
+
+    <button id="desktopSidebarToggle" class="desktop-sidebar-toggle" aria-label="Cerrar barra lateral">
+    <i class="fa-solid fa-bars"></i>
+</button>
+
+</div>
+
+
+
+<!-- =========================================================
+     SIDEBAR OVERLAY
+========================================================== -->
+
+<div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+></div>
+
+
+
+<!-- =========================================================
+     CONTEXT MENU
+========================================================== -->
+
+<div
+    class="context-menu"
+    id="contextMenu"
+>
+
+    <button data-action="rename">
+
+        <i class="fa-solid fa-pen"></i>
+
+        Renombrar
+
+    </button>
+
+
+    <button
+        data-action="delete"
+        class="danger"
+    >
+
+        <i class="fa-regular fa-trash-can"></i>
+
+        Eliminar
+
+    </button>
+
+</div>
+
+
+
+<!-- =========================================================
+     DELETE MODAL
+========================================================== -->
+
+<div
+    class="modal-backdrop"
+    id="modalBackdrop"
+>
+
+    <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deleteModalTitle"
+    >
+
+        <div class="modal-icon danger-icon">
+
+            <i class="fa-regular fa-trash-can"></i>
+
+        </div>
+
+
+        <h2 id="deleteModalTitle">
+            Borrar historial
+        </h2>
+
+
+        <p>
+            Se eliminarán todas tus conversaciones guardadas
+            en este navegador. Esta acción no se puede deshacer.
+        </p>
+
+
+        <div class="modal-actions">
+
+            <button
+                class="modal-cancel"
+                id="cancelDelete"
+            >
+                Cancelar
+            </button>
+
+
+            <button
+                class="modal-delete"
+                id="confirmDelete"
+            >
+                Borrar todo
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     TOAST
+========================================================== -->
+
+<div
+    class="toast"
+    id="toast"
+    role="status"
+    aria-live="polite"
+></div>
+
+
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================== -->
+
+<script src="js/app.js"></script>
+
+</body>
+</html>
