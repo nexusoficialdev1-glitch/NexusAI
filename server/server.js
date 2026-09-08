@@ -375,6 +375,7 @@ app.post("/api/auth/register", async (req, res) => {
         return res.status(201).json({
             success: true,
             message: "Cuenta creada correctamente.",
+            token,
             user: getSafeUser(user)
         });
 
@@ -467,6 +468,7 @@ app.post("/api/auth/login", async (req, res) => {
         return res.json({
             success: true,
             message: "Inicio de sesión correcto.",
+            token,
             user: getSafeUser(user)
         });
 
@@ -559,7 +561,7 @@ app.get(
 );
 
 res.redirect(
-    `${FRONTEND_URL}/app.html?user=${userData}`
+    `${FRONTEND_URL}/app.html?user=${userData}&token=${encodeURIComponent(token)}`
 );
 
         } catch (error) {
@@ -582,11 +584,19 @@ res.redirect(
 
 app.get("/api/auth/me", (req, res) => {
     try {
-        const token = req.cookies.nexusai_token;
+        // Acepta el token por cookie (mismo sitio) o por
+        // header Authorization: Bearer <token> (cross-site,
+        // evita el bloqueo de cookies de terceros del navegador).
+        const authHeader = req.headers.authorization || "";
+        const bearerToken = authHeader.startsWith("Bearer ")
+            ? authHeader.slice(7)
+            : null;
 
-        // No llegó la cookie
+        const token = bearerToken || req.cookies.nexusai_token;
+
+        // No llegó ni cookie ni header
         if (!token) {
-            console.log("❌ /auth/me: no llegó nexusai_token");
+            console.log("❌ /auth/me: no llegó token (ni cookie ni header)");
 
             return res.status(401).json({
                 success: false,
@@ -594,7 +604,7 @@ app.get("/api/auth/me", (req, res) => {
             });
         }
 
-        console.log("✅ /auth/me: cookie recibida");
+        console.log("✅ /auth/me: token recibido");
 
         let decoded;
 
