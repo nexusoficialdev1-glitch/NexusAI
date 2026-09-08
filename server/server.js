@@ -550,9 +550,17 @@ app.get(
              * después de cargar.
              */
 
-            res.redirect(
-                `${FRONTEND_URL}/app.html`
-            );
+            const userData = encodeURIComponent(
+    JSON.stringify({
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email
+    })
+);
+
+res.redirect(
+    `${FRONTEND_URL}/app.html?user=${userData}`
+);
 
         } catch (error) {
             console.error(
