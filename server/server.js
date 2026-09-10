@@ -270,14 +270,21 @@ if (
                 clientSecret: process.env.GITHUB_CLIENT_SECRET,
                 callbackURL: GITHUB_CALLBACK_URL
             },
+
             async (accessToken, refreshToken, profile, done) => {
                 try {
+
                     let email =
                         profile.emails?.find(e => e.value)?.value || null;
 
-                    // Si GitHub no incluye el correo en el perfil,
-                    // lo pedimos directamente usando user:email.
+                    /*
+                    =========================================
+                    OBTENER EMAIL DESDE GITHUB
+                    =========================================
+                    */
+
                     if (!email) {
+
                         const response = await fetch(
                             "https://api.github.com/user/emails",
                             {
@@ -291,7 +298,7 @@ if (
 
                         if (!response.ok) {
                             throw new Error(
-                                `No se pudieron obtener los correos de GitHub: ${response.status}`
+                                `GitHub /user/emails respondió ${response.status}`
                             );
                         }
 
@@ -299,9 +306,14 @@ if (
 
                         const selectedEmail =
                             emails.find(
-                                item => item.primary && item.verified
+                                email =>
+                                    email.primary &&
+                                    email.verified
                             ) ||
-                            emails.find(item => item.verified) ||
+                            emails.find(
+                                email =>
+                                    email.verified
+                            ) ||
                             emails[0];
 
                         email = selectedEmail?.email || null;
@@ -313,68 +325,135 @@ if (
                         );
                     }
 
-                    email = email.trim().toLowerCase();
+                    email = normalizeEmail(email);
+
+                    /*
+                    =========================================
+                    NOMBRE
+                    =========================================
+                    */
 
                     const name =
                         profile.displayName ||
                         profile.username ||
                         "Usuario de GitHub";
 
-                    db.get(
-                        "SELECT * FROM users WHERE email = ?",
-                        [email],
-                        async (err, user) => {
-                            if (err) {
-                                return done(err);
-                            }
+                    /*
+                    =========================================
+                    BUSCAR USUARIO
+                    =========================================
+                    */
 
-                            if (user) {
-                                return done(null, user);
-                            }
+                    let user = db
+                        .prepare(`
+                            SELECT
+                                id,
+                                name,
+                                email,
+                                password_hash,
+                                created_at
+                            FROM users
+                            WHERE email = ?
+                        `)
+                        .get(email);
 
-                            try {
-                                const randomPassword =
-                                    crypto.randomBytes(32).toString("hex");
+                    /*
+                    =========================================
+                    CREAR USUARIO SI NO EXISTE
+                    =========================================
+                    */
 
-                                const hashedPassword =
-                                    await bcrypt.hash(randomPassword, 12);
+                    if (!user) {
 
-                                db.run(
-                                    `
-                                    INSERT INTO users
-                                    (name, email, password)
-                                    VALUES (?, ?, ?)
-                                    `,
-                                    [name, email, hashedPassword],
-                                    function (insertErr) {
-                                        if (insertErr) {
-                                            return done(insertErr);
-                                        }
+                        const randomPassword =
+                            crypto
+                                .randomBytes(32)
+                                .toString("hex");
 
-                                        db.get(
-                                            "SELECT * FROM users WHERE id = ?",
-                                            [this.lastID],
-                                            (findErr, newUser) => {
-                                                if (findErr) {
-                                                    return done(findErr);
-                                                }
+                        const passwordHash =
+                            await bcrypt.hash(
+                                randomPassword,
+                                12
+                            );
 
-                                                return done(null, newUser);
-                                            }
-                                        );
-                                    }
-                                );
-                            } catch (error) {
-                                return done(error);
-                            }
-                        }
+                        const result = db
+                            .prepare(`
+                                INSERT INTO users (
+                                    name,
+                                    email,
+                                    password_hash
+                                )
+                                VALUES (?, ?, ?)
+                            `)
+                            .run(
+                                name,
+                                email,
+                                passwordHash
+                            );
+
+                        user = db
+                            .prepare(`
+                                SELECT
+                                    id,
+                                    name,
+                                    email,
+                                    password_hash,
+                                    created_at
+                                FROM users
+                                WHERE id = ?
+                            `)
+                            .get(
+                                result.lastInsertRowid
+                            );
+                    }
+
+                    /*
+                    =========================================
+                    ACTUALIZAR NOMBRE
+                    =========================================
+                    */
+
+                    if (
+                        user.name === "Usuario de GitHub" &&
+                        name
+                    ) {
+
+                        db.prepare(`
+                            UPDATE users
+                            SET name = ?
+                            WHERE id = ?
+                        `).run(
+                            name,
+                            user.id
+                        );
+
+                        user.name = name;
+                    }
+
+                    console.log(
+                        "✅ GitHub login correcto:",
+                        user.email
                     );
+
+                    return done(null, user);
+
                 } catch (error) {
-                    console.error("GitHub OAuth error:", error);
+
+                    console.error(
+                        "❌ GitHub OAuth error:",
+                        error
+                    );
+
                     return done(error);
                 }
             }
         )
+    );
+
+} else {
+
+    console.warn(
+        "⚠️ GitHub OAuth desactivado: faltan GITHUB_CLIENT_ID o GITHUB_CLIENT_SECRET."
     );
 }
 
