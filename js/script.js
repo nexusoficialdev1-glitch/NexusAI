@@ -397,12 +397,19 @@ YA HAY SESIÓN ACTIVA — REDIRIGIR A app.html
         */
 
         function socialLogin(provider) {
-            if (provider === "google") {
-                window.location.href = `${API_URL}/auth/google`;
-                return
-            }
-            showToast (
-                 `Inicio de sesión con ${provider} próximamente.`,
+
+    if (provider === "google") {
+        window.location.href = `${API_URL}/auth/google`;
+        return;
+    }
+
+    if (provider === "github") {
+        window.location.href = `${API_URL}/auth/github`;
+        return;
+    }
+
+    showToast(
+        `Inicio de sesión con ${provider} próximamente.`,
         "error"
-            );
-        }
+    );
+}
