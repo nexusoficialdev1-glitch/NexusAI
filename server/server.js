@@ -9,7 +9,7 @@ const crypto = require("crypto");
 const Database = require("better-sqlite3");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-
+const GitHubStrategy = require("passport-github2").Strategy;
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -25,6 +25,10 @@ const FRONTEND_URL =
 const GOOGLE_CALLBACK_URL =
     process.env.GOOGLE_CALLBACK_URL ||
     `http://localhost:${PORT}/api/auth/google/callback`;
+
+    const GITHUB_CALLBACK_URL =
+    process.env.GITHUB_CALLBACK_URL ||
+    `http://localhost:${PORT}/api/auth/github/callback`;
 
 
 /* =========================================================
@@ -252,6 +256,113 @@ if (
 } else {
     console.warn(
         "⚠️ Google OAuth desactivado: faltan GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET."
+    );
+}
+
+/* =========================================================
+   GITHUB OAUTH
+========================================================= */
+
+if (
+    process.env.GITHUB_CLIENT_ID &&
+    process.env.GITHUB_CLIENT_SECRET
+) {
+    passport.use(
+        new GitHubStrategy(
+            {
+                clientID: process.env.GITHUB_CLIENT_ID,
+                clientSecret: process.env.GITHUB_CLIENT_SECRET,
+                callbackURL: GITHUB_CALLBACK_URL
+            },
+
+            async (accessToken, refreshToken, profile, done) => {
+                try {
+                    const email =
+                        profile.emails?.[0]?.value
+                            ? normalizeEmail(profile.emails[0].value)
+                            : null;
+
+                    if (!email) {
+                        return done(
+                            new Error(
+                                "GitHub no proporcionó un correo electrónico."
+                            )
+                        );
+                    }
+
+                    const name =
+                        profile.displayName ||
+                        profile.username ||
+                        "Usuario de GitHub";
+
+                    let user = db
+                        .prepare(`
+                            SELECT
+                                id,
+                                name,
+                                email,
+                                password_hash,
+                                created_at
+                            FROM users
+                            WHERE email = ?
+                        `)
+                        .get(email);
+
+                    if (!user) {
+                        const randomPassword = crypto
+                            .randomBytes(32)
+                            .toString("hex");
+
+                        const passwordHash = await bcrypt.hash(
+                            randomPassword,
+                            12
+                        );
+
+                        const result = db
+                            .prepare(`
+                                INSERT INTO users (
+                                    name,
+                                    email,
+                                    password_hash
+                                )
+                                VALUES (?, ?, ?)
+                            `)
+                            .run(
+                                name,
+                                email,
+                                passwordHash
+                            );
+
+                        user = db
+                            .prepare(`
+                                SELECT
+                                    id,
+                                    name,
+                                    email,
+                                    password_hash,
+                                    created_at
+                                FROM users
+                                WHERE id = ?
+                            `)
+                            .get(result.lastInsertRowid);
+                    }
+
+                    return done(null, user);
+
+                } catch (error) {
+                    console.error(
+                        "GitHub OAuth error:",
+                        error
+                    );
+
+                    return done(error);
+                }
+            }
+        )
+    );
+} else {
+    console.warn(
+        "⚠️ GitHub OAuth desactivado: faltan GITHUB_CLIENT_ID o GITHUB_CLIENT_SECRET."
     );
 }
 
@@ -565,6 +676,83 @@ res.redirect(
         } catch (error) {
             console.error(
                 "Google callback error:",
+                error
+            );
+
+            res.redirect(
+                `${FRONTEND_URL}/index.html`
+            );
+        }
+    }
+);
+
+/* =========================================================
+   GITHUB LOGIN
+========================================================= */
+
+app.get(
+    "/api/auth/github",
+    (req, res, next) => {
+        if (
+            !process.env.GITHUB_CLIENT_ID ||
+            !process.env.GITHUB_CLIENT_SECRET
+        ) {
+            return res.status(503).send(`
+                <h1>GitHub OAuth no está configurado</h1>
+                <p>Configura GITHUB_CLIENT_ID y GITHUB_CLIENT_SECRET en Render.</p>
+            `);
+        }
+
+        next();
+    },
+
+    passport.authenticate("github", {
+        scope: ["user:email"],
+        session: false
+    })
+);
+
+
+/* =========================================================
+   GITHUB CALLBACK
+========================================================= */
+
+app.get(
+    "/api/auth/github/callback",
+
+    passport.authenticate("github", {
+        failureRedirect: `${FRONTEND_URL}/index.html`,
+        session: false
+    }),
+
+    (req, res) => {
+        try {
+            const token = createToken(
+                req.user,
+                false
+            );
+
+            setAuthCookie(
+                res,
+                token,
+                false
+            );
+
+            const userData = encodeURIComponent(
+                JSON.stringify({
+                    id: req.user.id,
+                    name: req.user.name,
+                    email: req.user.email
+                })
+            );
+
+            res.redirect(
+                `${FRONTEND_URL}/app.html?token=${token}&user=${userData}`
+            );
+
+        } catch (error) {
+            console.error(
+                "GitHub callback error:",
                 error
             );
 
