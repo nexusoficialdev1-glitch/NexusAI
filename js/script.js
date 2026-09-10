@@ -1,4 +1,47 @@
 const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
+
+
+/*
+=========================================
+YA HAY SESIÓN ACTIVA — REDIRIGIR A app.html
+=========================================
+*/
+
+(async function redirectIfLoggedIn() {
+
+    const token = localStorage.getItem("nexusai_token");
+
+    if (!token) return;
+
+    try {
+
+        const response = await fetch(
+            `${API_URL}/auth/me`,
+            {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            window.location.href = "app.html";
+        } else {
+            // Token inválido/expirado: lo limpiamos para
+            // que no se quede intentando en cada visita.
+            localStorage.removeItem("nexusai_token");
+        }
+
+    } catch (error) {
+        console.error("Error verificando sesión:", error);
+    }
+
+})();
+
  
  
  const loginForm =
@@ -95,7 +138,7 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
 
         loginForm.addEventListener(
             "submit",
-            function(event) {
+            async function(event) {
 
                 event.preventDefault();
 
@@ -104,6 +147,9 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
 
                 const password =
                     document.getElementById("loginPassword").value;
+
+                const remember =
+                    document.getElementById("remember").checked;
 
 
                 if (!email || !password) {
@@ -127,21 +173,62 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
                     '<span class="spinner"></span>';
 
 
-                setTimeout(() => {
+                try {
 
-                    button.classList.remove(
-                        "button-loading"
+                    const response = await fetch(
+                        `${API_URL}/auth/login`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({
+                                email,
+                                password,
+                                remember
+                            })
+                        }
                     );
 
-                    button.textContent =
-                        "Iniciar sesión";
+                    const data = await response.json();
 
+                    if (!response.ok || !data.success) {
+
+                        showToast(
+                            data.message ||
+                            "Correo o contraseña incorrectos."
+                        );
+
+                        return;
+
+                    }
+
+                    // Guardamos el token para enviarlo como
+                    // Authorization: Bearer en cada petición
+                    // (evita depender solo de la cookie cross-site).
+                    localStorage.setItem(
+                        "nexusai_token",
+                        data.token
+                    );
+
+                    window.location.href = "app.html";
+
+                } catch (error) {
+
+                    console.error("Login error:", error);
 
                     showToast(
-                        "Inicio de sesión de demostración."
+                        "No se pudo conectar con el servidor."
                     );
 
-                }, 800);
+                } finally {
+
+                    button.classList.remove("button-loading");
+
+                    button.textContent = "Iniciar sesión";
+
+                }
 
             }
         );
@@ -155,7 +242,7 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
 
         registerForm.addEventListener(
             "submit",
-            function(event) {
+            async function(event) {
 
                 event.preventDefault();
 
@@ -222,51 +309,67 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
                     '<span class="spinner"></span>';
 
 
-                /*
-                 * DEMO
-                 */
+                try {
 
-                const user = {
-
-                    name: name,
-                    email: email
-
-                };
-
-
-                localStorage.setItem(
-                    "nexusai_demo_user",
-                    JSON.stringify(user)
-                );
-
-
-                setTimeout(() => {
-
-                    button.classList.remove(
-                        "button-loading"
+                    const response = await fetch(
+                        `${API_URL}/auth/register`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({
+                                name,
+                                email,
+                                password
+                            })
+                        }
                     );
 
-                    button.textContent =
-                        "Crear cuenta";
+                    const data = await response.json();
 
+                    if (!response.ok || !data.success) {
+
+                        showToast(
+                            data.message ||
+                            "Ocurrió un error al crear la cuenta."
+                        );
+
+                        return;
+
+                    }
+
+                    localStorage.setItem(
+                        "nexusai_token",
+                        data.token
+                    );
 
                     showToast(
                         "Cuenta creada correctamente."
                     );
 
-
                     setTimeout(() => {
 
-                        showLogin();
-
-                        document
-                            .getElementById("loginEmail")
-                            .value = email;
+                        window.location.href = "app.html";
 
                     }, 700);
 
+                } catch (error) {
 
-                }, 800);
+                    console.error("Register error:", error);
+
+                    showToast(
+                        "No se pudo conectar con el servidor."
+                    );
+
+                } finally {
+
+                    button.classList.remove("button-loading");
+
+                    button.textContent = "Crear cuenta";
+
+                }
 
             }
         );
@@ -303,5 +406,3 @@ const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
         "error"
             );
         }
-
-        

@@ -20,7 +20,7 @@ const JWT_SECRET =
 
 const FRONTEND_URL =
     process.env.FRONTEND_URL ||
-    "https://nexusai-platform-dev.netlify.app";
+    "https://apexxxaiiii.vercel.app/";
 
 const GOOGLE_CALLBACK_URL =
     process.env.GOOGLE_CALLBACK_URL ||
@@ -62,7 +62,7 @@ const corsOptions = {
     origin: [
         "http://localhost:5500",
         "http://127.0.0.1:5500",
-        "https://nexusai-platform-dev.netlify.app"
+        "https://apexxxaiiii.vercel.app"
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -116,34 +116,6 @@ function getSafeUser(user) {
         email: user.email,
         created_at: user.created_at
     };
-}
-
-
-function requireAuth(req, res, next) {
-    const authHeader = req.headers.authorization || "";
-    const bearerToken = authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : null;
-
-    const token = bearerToken || req.cookies.nexusai_token;
-
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: "No llegó la cookie de sesión."
-        });
-    }
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.userId = decoded.id;
-        next();
-    } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: "Token inválido o expirado."
-        });
-    }
 }
 
 
@@ -403,7 +375,6 @@ app.post("/api/auth/register", async (req, res) => {
         return res.status(201).json({
             success: true,
             message: "Cuenta creada correctamente.",
-            token,
             user: getSafeUser(user)
         });
 
@@ -496,7 +467,6 @@ app.post("/api/auth/login", async (req, res) => {
         return res.json({
             success: true,
             message: "Inicio de sesión correcto.",
-            token,
             user: getSafeUser(user)
         });
 
@@ -589,7 +559,7 @@ app.get(
 );
 
 res.redirect(
-    `${FRONTEND_URL}/app.html?user=${userData}&token=${encodeURIComponent(token)}`
+    `${FRONTEND_URL}/app.html?user=${userData}`
 );
 
         } catch (error) {
@@ -612,19 +582,11 @@ res.redirect(
 
 app.get("/api/auth/me", (req, res) => {
     try {
-        // Acepta el token por cookie (mismo sitio) o por
-        // header Authorization: Bearer <token> (cross-site,
-        // evita el bloqueo de cookies de terceros del navegador).
-        const authHeader = req.headers.authorization || "";
-        const bearerToken = authHeader.startsWith("Bearer ")
-            ? authHeader.slice(7)
-            : null;
+        const token = req.cookies.nexusai_token;
 
-        const token = bearerToken || req.cookies.nexusai_token;
-
-        // No llegó ni cookie ni header
+        // No llegó la cookie
         if (!token) {
-            console.log("❌ /auth/me: no llegó token (ni cookie ni header)");
+            console.log("❌ /auth/me: no llegó nexusai_token");
 
             return res.status(401).json({
                 success: false,
@@ -632,7 +594,7 @@ app.get("/api/auth/me", (req, res) => {
             });
         }
 
-        console.log("✅ /auth/me: token recibido");
+        console.log("✅ /auth/me: cookie recibida");
 
         let decoded;
 
@@ -697,140 +659,6 @@ app.post("/api/auth/logout", (req, res) => {
         success: true,
         message: "Sesión cerrada correctamente."
     });
-});
-
-
-/* =========================================================
-   AJUSTES DE CUENTA
-========================================================= */
-
-app.put("/api/user/name", requireAuth, (req, res) => {
-    try {
-        const name = String(req.body.name || "").trim();
-
-        if (!name) {
-            return res.status(400).json({
-                success: false,
-                message: "El nombre no puede estar vacío."
-            });
-        }
-
-        db.prepare(`
-            UPDATE users
-            SET name = ?
-            WHERE id = ?
-        `).run(name, req.userId);
-
-        const user = db.prepare(`
-            SELECT id, name, email, created_at
-            FROM users
-            WHERE id = ?
-        `).get(req.userId);
-
-        return res.json({
-            success: true,
-            message: "Nombre actualizado correctamente.",
-            user: getSafeUser(user)
-        });
-
-    } catch (error) {
-        console.error("Update name error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Ocurrió un error al actualizar el nombre."
-        });
-    }
-});
-
-
-app.put("/api/user/password", requireAuth, async (req, res) => {
-    try {
-        const currentPassword = String(req.body.currentPassword || "");
-        const newPassword = String(req.body.newPassword || "");
-
-        if (newPassword.length < 8) {
-            return res.status(400).json({
-                success: false,
-                message: "La nueva contraseña debe tener al menos 8 caracteres."
-            });
-        }
-
-        const user = db.prepare(`
-            SELECT id, password_hash
-            FROM users
-            WHERE id = ?
-        `).get(req.userId);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "Usuario no encontrado."
-            });
-        }
-
-        const passwordValid = await bcrypt.compare(
-            currentPassword,
-            user.password_hash
-        );
-
-        if (!passwordValid) {
-            return res.status(401).json({
-                success: false,
-                message: "La contraseña actual es incorrecta."
-            });
-        }
-
-        const newHash = await bcrypt.hash(newPassword, 12);
-
-        db.prepare(`
-            UPDATE users
-            SET password_hash = ?
-            WHERE id = ?
-        `).run(newHash, req.userId);
-
-        return res.json({
-            success: true,
-            message: "Contraseña actualizada correctamente."
-        });
-
-    } catch (error) {
-        console.error("Update password error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Ocurrió un error al actualizar la contraseña."
-        });
-    }
-});
-
-
-app.delete("/api/user", requireAuth, (req, res) => {
-    try {
-        db.prepare(`
-            DELETE FROM users
-            WHERE id = ?
-        `).run(req.userId);
-
-        res.clearCookie("nexusai_token", {
-            httpOnly: true,
-            secure: true,
-            sameSite: "none"
-        });
-
-        return res.json({
-            success: true,
-            message: "Cuenta eliminada correctamente."
-        });
-
-    } catch (error) {
-        console.error("Delete account error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Ocurrió un error al eliminar la cuenta."
-        });
-    }
 });
 
 

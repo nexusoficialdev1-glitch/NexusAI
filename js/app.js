@@ -20,7 +20,7 @@ const THEME_KEY = "nexusai_theme";
  * Por ahora NexusAI funciona en modo demo para que
  * toda la interfaz pueda probarse sin backend.
  */
-const API_URL = "";
+const API_URL = "https://nexusaia.onrender.com/api/chat";
 
 
 /* =========================================================
@@ -482,7 +482,8 @@ async function requestAPI(chat, text, file) {
     const payload = {
         message: text,
         conversation_id: chat.id,
-        history: chat.messages
+        history: chat.messages,
+        custom_instructions: getCustomInstructions()
     };
 
 
@@ -769,6 +770,13 @@ function appendMessage(message) {
     content.appendChild(role);
     content.appendChild(text);
 
+
+    /* Acciones (copiar / like / dislike) — solo en respuestas del asistente */
+    if (message.role === "assistant") {
+        content.appendChild(createMessageActions(message));
+    }
+
+
     article.appendChild(avatar);
     article.appendChild(content);
 
@@ -780,71 +788,480 @@ function appendMessage(message) {
 
 
 /* =========================================================
-   MESSAGE CONTENT
+   MESSAGE ACTIONS — COPIAR / LIKE / DISLIKE
    ========================================================= */
 
+function createMessageActions(message) {
+
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+
+
+    /* Copiar */
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "message-action-btn";
+    copyBtn.title = "Copiar";
+    copyBtn.setAttribute("aria-label", "Copiar mensaje");
+    copyBtn.innerHTML = `<i class="fa-regular fa-copy"></i>`;
+
+    copyBtn.addEventListener("click", () => {
+        copyMessageText(message.content, copyBtn);
+    });
+
+
+    /* Like */
+    const likeBtn = document.createElement("button");
+    likeBtn.type = "button";
+    likeBtn.className = "message-action-btn message-like-btn";
+    likeBtn.title = "Buena respuesta";
+    likeBtn.setAttribute("aria-label", "Buena respuesta");
+
+
+    /* Dislike */
+    const dislikeBtn = document.createElement("button");
+    dislikeBtn.type = "button";
+    dislikeBtn.className = "message-action-btn message-dislike-btn";
+    dislikeBtn.title = "Mala respuesta";
+    dislikeBtn.setAttribute("aria-label", "Mala respuesta");
+
+
+    updateFeedbackButtons(message.feedback, likeBtn, dislikeBtn);
+
+
+    likeBtn.addEventListener("click", () => {
+        const next = message.feedback === "like" ? null : "like";
+
+        setMessageFeedback(message, next);
+        updateFeedbackButtons(message.feedback, likeBtn, dislikeBtn);
+    });
+
+    dislikeBtn.addEventListener("click", () => {
+        const next = message.feedback === "dislike" ? null : "dislike";
+
+        setMessageFeedback(message, next);
+        updateFeedbackButtons(message.feedback, likeBtn, dislikeBtn);
+    });
+
+
+    actions.appendChild(copyBtn);
+    actions.appendChild(likeBtn);
+    actions.appendChild(dislikeBtn);
+
+    return actions;
+}
+
+
+function updateFeedbackButtons(feedback, likeBtn, dislikeBtn) {
+
+    likeBtn.classList.toggle("active", feedback === "like");
+    dislikeBtn.classList.toggle("active", feedback === "dislike");
+
+    likeBtn.innerHTML =
+        feedback === "like"
+            ? `<i class="fa-solid fa-thumbs-up"></i>`
+            : `<i class="fa-regular fa-thumbs-up"></i>`;
+
+    dislikeBtn.innerHTML =
+        feedback === "dislike"
+            ? `<i class="fa-solid fa-thumbs-down"></i>`
+            : `<i class="fa-regular fa-thumbs-down"></i>`;
+}
+
+
+function setMessageFeedback(message, value) {
+
+    message.feedback = value;
+
+
+    /* Sincronizar con el objeto guardado en el chat (por si difiere la referencia) */
+    const chat = getCurrentChat();
+
+    if (chat) {
+        const target = chat.messages.find(
+            (item) => item.id === message.id
+        );
+
+        if (target) {
+            target.feedback = value;
+        }
+    }
+
+    saveChats();
+
+    if (value === "like") {
+        showToast("Gracias por tu feedback 👍");
+    } else if (value === "dislike") {
+        showToast("Gracias por tu feedback 👎");
+    }
+}
+
+
+function copyMessageText(content, button) {
+
+    if (!content) return;
+
+
+    const finish = () => {
+        const icon = button.querySelector("i");
+        if (!icon) return;
+
+        const original = icon.className;
+        icon.className = "fa-solid fa-check";
+
+        showToast("Mensaje copiado");
+
+        setTimeout(() => {
+            icon.className = original;
+        }, 1500);
+    };
+
+
+    if (navigator.clipboard?.writeText) {
+
+        navigator.clipboard.writeText(content)
+            .then(finish)
+            .catch(() => fallbackCopy(content, finish));
+
+    } else {
+
+        fallbackCopy(content, finish);
+    }
+}
+
+
+function fallbackCopy(text, callback) {
+
+    const textarea = document.createElement("textarea");
+
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+
+    document.body.appendChild(textarea);
+
+    textarea.focus();
+    textarea.select();
+
+    try {
+        document.execCommand("copy");
+        callback?.();
+    } catch (error) {
+        console.error("No se pudo copiar:", error);
+        showToast("No se pudo copiar el mensaje");
+    }
+
+    document.body.removeChild(textarea);
+}
+
+
+/* =========================================================
+   MESSAGE CONTENT — MARKDOWN
+   ========================================================= */
+
+function unescapeMarkdown(text) {
+    // Algunos modelos devuelven markdown "escapado" (\#, \|, \*...)
+    // como si el destino fuera Telegram MarkdownV2 u otro canal.
+    // Aquí quitamos ese backslash para que nuestro parser lo
+    // interprete como markdown normal.
+    return text.replace(/\\([#|_*`~\[\]()>\-.!{}=+])/g, "$1");
+}
+
 function renderMessageContent(element, content) {
+    if (!element) return;
 
-    /*
-     * Separamos bloques de código simples para evitar
-     * mostrar todo como texto plano.
-     */
+    element.innerHTML = "";
 
-    const codeRegex =
-        /```([\w-]*)\n?([\s\S]*?)```/g;
+    if (!content) return;
 
+    const blocks = unescapeMarkdown(content)
+        .replace(/\r\n/g, "\n")
+        .split(/\n{2,}/);
+
+    blocks.forEach((block) => {
+        block = block.trim();
+
+        if (!block) return;
+
+        // Código
+        const codeMatch = block.match(/^```([\w-]*)\n?([\s\S]*?)```$/);
+
+        if (codeMatch) {
+            const pre = document.createElement("pre");
+            const code = document.createElement("code");
+
+            if (codeMatch[1]) {
+                code.dataset.language = codeMatch[1];
+            }
+
+            code.textContent = codeMatch[2].trim();
+
+            pre.appendChild(code);
+            element.appendChild(pre);
+            return;
+        }
+
+        // Encabezados
+        const headingMatch = block.match(/^(#{1,3})\s+(.+)$/);
+
+        if (headingMatch) {
+            const level = headingMatch[1].length;
+            const heading = document.createElement(`h${level}`);
+
+            appendInlineMarkdown(
+                heading,
+                headingMatch[2]
+            );
+
+            element.appendChild(heading);
+            return;
+        }
+
+        // Tabla Markdown
+        const lines = block.split("\n");
+
+        if (
+            lines.length >= 2 &&
+            lines[0].includes("|") &&
+            /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(lines[1])
+        ) {
+            renderMarkdownTable(element, lines);
+            return;
+        }
+
+        // Lista
+        if (lines.every(line => /^[-*+]\s+/.test(line))) {
+            const ul = document.createElement("ul");
+
+            lines.forEach(line => {
+                const li = document.createElement("li");
+
+                appendInlineMarkdown(
+                    li,
+                    line.replace(/^[-*+]\s+/, "")
+                );
+
+                ul.appendChild(li);
+            });
+
+            element.appendChild(ul);
+            return;
+        }
+
+        // Lista numerada
+        if (lines.every(line => /^\d+\.\s+/.test(line))) {
+            const ol = document.createElement("ol");
+
+            lines.forEach(line => {
+                const li = document.createElement("li");
+
+                appendInlineMarkdown(
+                    li,
+                    line.replace(/^\d+\.\s+/, "")
+                );
+
+                ol.appendChild(li);
+            });
+
+            element.appendChild(ol);
+            return;
+        }
+
+        // Cita
+        if (lines.every(line => /^>\s?/.test(line))) {
+            const blockquote = document.createElement("blockquote");
+
+            lines.forEach(line => {
+                appendInlineMarkdown(
+                    blockquote,
+                    line.replace(/^>\s?/, "")
+                );
+            });
+
+            element.appendChild(blockquote);
+            return;
+        }
+
+        // Separador
+        if (/^([-*_])\s*\1\s*\1\s*$/.test(block)) {
+            const hr = document.createElement("hr");
+            element.appendChild(hr);
+            return;
+        }
+
+        // Párrafo normal
+        const paragraph = document.createElement("p");
+
+        lines.forEach((line, index) => {
+            if (index > 0) {
+                paragraph.appendChild(
+                    document.createElement("br")
+                );
+            }
+
+            appendInlineMarkdown(
+                paragraph,
+                line
+            );
+        });
+
+        element.appendChild(paragraph);
+    });
+}
+
+
+/* =========================================================
+   INLINE MARKDOWN
+   ========================================================= */
+
+function appendInlineMarkdown(parent, text) {
+    const fragment = document.createDocumentFragment();
+
+    const regex =
+        /(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\))/g;
 
     let lastIndex = 0;
     let match;
 
+    while ((match = regex.exec(text)) !== null) {
 
-    while ((match = codeRegex.exec(content)) !== null) {
-
-        const before =
-            content.slice(
-                lastIndex,
-                match.index
-            );
-
-
-        if (before) {
-            appendFormattedText(
-                element,
-                before
+        if (match.index > lastIndex) {
+            fragment.appendChild(
+                document.createTextNode(
+                    text.slice(lastIndex, match.index)
+                )
             );
         }
 
+        const token = match[0];
 
-        const pre =
-            document.createElement("pre");
+        // Negrita
+        if (
+            token.startsWith("**") &&
+            token.endsWith("**")
+        ) {
+            const strong = document.createElement("strong");
 
-        const code =
-            document.createElement("code");
+            strong.textContent =
+                token.slice(2, -2);
 
+            fragment.appendChild(strong);
+        }
 
-        code.textContent = match[2].trim();
+        // Cursiva
+        else if (
+            token.startsWith("*") &&
+            token.endsWith("*")
+        ) {
+            const em = document.createElement("em");
 
-        pre.appendChild(code);
+            em.textContent =
+                token.slice(1, -1);
 
-        element.appendChild(pre);
+            fragment.appendChild(em);
+        }
 
+        // Código inline
+        else if (token.startsWith("`")) {
+            const code = document.createElement("code");
+
+            code.textContent =
+                token.slice(1, -1);
+
+            fragment.appendChild(code);
+        }
+
+        // Enlace
+        else {
+            const linkMatch =
+                token.match(/^\[(.*?)\]\((.*?)\)$/);
+
+            if (linkMatch) {
+                const a = document.createElement("a");
+
+                a.textContent = linkMatch[1];
+                a.href = linkMatch[2];
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+
+                fragment.appendChild(a);
+            }
+        }
 
         lastIndex =
-            match.index +
-            match[0].length;
+            match.index + token.length;
     }
 
-
-    const remaining =
-        content.slice(lastIndex);
-
-
-    if (remaining) {
-        appendFormattedText(
-            element,
-            remaining
+    if (lastIndex < text.length) {
+        fragment.appendChild(
+            document.createTextNode(
+                text.slice(lastIndex)
+            )
         );
     }
+
+    parent.appendChild(fragment);
+}
+
+
+/* =========================================================
+   MARKDOWN TABLE
+   ========================================================= */
+
+function renderMarkdownTable(parent, lines) {
+    const table = document.createElement("table");
+    table.className = "message-table";
+
+    const header = lines[0]
+        .split("|")
+        .map(cell => cell.trim())
+        .filter(Boolean);
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+
+    header.forEach(cell => {
+        const th = document.createElement("th");
+
+        appendInlineMarkdown(th, cell);
+
+        headerRow.appendChild(th);
+    });
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    lines.slice(2).forEach(line => {
+        const cells = line
+            .split("|")
+            .map(cell => cell.trim())
+            .filter(Boolean);
+
+        if (!cells.length) return;
+
+        const row = document.createElement("tr");
+
+        cells.forEach(cell => {
+            const td = document.createElement("td");
+
+            appendInlineMarkdown(td, cell);
+
+            row.appendChild(td);
+        });
+
+        tbody.appendChild(row);
+    });
+
+    table.appendChild(tbody);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "message-table-wrapper";
+
+    wrapper.appendChild(table);
+
+    parent.appendChild(wrapper);
 }
 
 
@@ -1908,24 +2325,85 @@ function getUserInitial() {
 
 const AUTH_API = "https://nexus-ai-api-iwqr.onrender.com/api";
 
+// Guarda/lee el token en localStorage. Esto evita depender
+// solo de la cookie cross-site, que Chrome/Firefox/Safari
+// pueden bloquear por ser de "tercero" (frontend y backend
+// están en dominios distintos: netlify.app vs onrender.com).
+function getAuthToken() {
+    return localStorage.getItem("nexusai_token");
+}
+
+function setAuthToken(token) {
+    if (token) {
+        localStorage.setItem("nexusai_token", token);
+    }
+}
+
 async function loadUser() {
+
+    const params = new URLSearchParams(window.location.search);
+    const userParam = params.get("user");
+    const tokenParam = params.get("token");
+
+    // Si venimos de la redirección de Google OAuth, el token
+    // llega por query string: lo guardamos y limpiamos la URL.
+    if (tokenParam) {
+        setAuthToken(tokenParam);
+
+        params.delete("token");
+        params.delete("user");
+
+        const newUrl =
+            window.location.pathname +
+            (params.toString() ? `?${params.toString()}` : "");
+
+        window.history.replaceState({}, "", newUrl);
+    }
+
+    const token = getAuthToken();
+
+    // Sin token guardado: no hay sesión, directo al login.
+    if (!token) {
+        window.location.href = "index.html";
+        return;
+    }
+
     try {
         const response = await fetch(
             `${AUTH_API}/auth/me`,
             {
                 method: "GET",
-                credentials: "include"
+                credentials: "include",
+                headers: token
+                    ? { Authorization: `Bearer ${token}` }
+                    : {}
             }
         );
 
         if (!response.ok) {
-            console.warn("No hay una sesión activa.");
-            return;
-        }
+    let errorData = {};
+
+    try {
+        errorData = await response.json();
+    } catch {
+        errorData = {};
+    }
+
+    console.error("AUTH /ME ERROR:", response.status, errorData);
+
+    // No hay sesión válida: fuera de aquí, al login.
+    localStorage.removeItem("nexusai_token");
+    localStorage.removeItem("nexusai_user");
+    window.location.href = "index.html";
+    return;
+}
 
         const data = await response.json();
 
         if (!data.success || !data.user) {
+            localStorage.removeItem("nexusai_token");
+            localStorage.removeItem("nexusai_user");
+            window.location.href = "index.html";
             return;
         }
 
@@ -2095,3 +2573,462 @@ if (
         "sidebar-collapsed"
     );
 }
+
+
+/* =========================================================
+   MENÚ DE USUARIO (⋯) Y AJUSTES
+   ========================================================= */
+
+const SETTINGS_KEY = "nexusai_settings";
+
+const userMoreBtn = $("#userMoreBtn");
+const userMenu = $("#userMenu");
+
+const settingsBackdrop = $("#settingsBackdrop");
+const closeSettingsBtn = $("#closeSettings");
+
+const settingsTabs = $("#settingsTabs");
+const settingsPanels = $$(".settings-panel");
+
+// General
+const settingsThemeSelect = $("#settingsThemeSelect");
+const settingsLangSelect = $("#settingsLangSelect");
+const settingsPromptCards = $("#settingsPromptCards");
+
+// Personalización
+const settingsNickname = $("#settingsNickname");
+const settingsCustomInstructions = $("#settingsCustomInstructions");
+const savePersonalizationBtn = $("#savePersonalizationBtn");
+
+// Cuenta
+const settingsNameForm = $("#settingsNameForm");
+const settingsName = $("#settingsName");
+const settingsNameBtn = $("#settingsNameBtn");
+
+const settingsPasswordForm = $("#settingsPasswordForm");
+const settingsCurrentPassword = $("#settingsCurrentPassword");
+const settingsNewPassword = $("#settingsNewPassword");
+const settingsPasswordBtn = $("#settingsPasswordBtn");
+
+const deleteAccountBtn = $("#deleteAccountBtn");
+
+// Datos
+const exportChatsBtn = $("#exportChatsBtn");
+const deleteAllChatsFromSettingsBtn = $("#deleteAllChatsFromSettingsBtn");
+
+
+function getSettings() {
+    try {
+        return JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function saveSettings(patch) {
+    const current = getSettings();
+    const updated = { ...current, ...patch };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+    return updated;
+}
+
+function getCustomInstructions() {
+    const settings = getSettings();
+    return {
+        nickname: settings.nickname || "",
+        instructions: settings.instructions || ""
+    };
+}
+
+
+// --- Abrir / cerrar menú (⋯) ---
+
+userMoreBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    userMenu?.classList.toggle("active");
+});
+
+document.addEventListener("click", (event) => {
+    if (
+        userMenu &&
+        !userMenu.contains(event.target) &&
+        event.target !== userMoreBtn
+    ) {
+        userMenu.classList.remove("active");
+    }
+});
+
+
+// --- Acciones del menú ---
+
+userMenu?.addEventListener("click", (event) => {
+
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+
+    userMenu.classList.remove("active");
+
+    if (button.dataset.action === "settings") {
+        openSettingsModal();
+    }
+
+    if (button.dataset.action === "logout") {
+        handleLogout();
+    }
+});
+
+
+// --- Pestañas ---
+
+settingsTabs?.addEventListener("click", (event) => {
+
+    const tabBtn = event.target.closest(".settings-tab");
+    if (!tabBtn) return;
+
+    const target = tabBtn.dataset.tab;
+
+    $$(".settings-tab").forEach((tab) => {
+        tab.classList.toggle("active", tab === tabBtn);
+    });
+
+    settingsPanels.forEach((panel) => {
+        panel.classList.toggle(
+            "active",
+            panel.dataset.panel === target
+        );
+    });
+});
+
+
+// --- Abrir / cerrar modal ---
+
+function openSettingsModal() {
+
+    const savedUser = JSON.parse(
+        localStorage.getItem("nexusai_user") || "null"
+    );
+
+    const settings = getSettings();
+
+    // General
+    const isDark =
+        document.documentElement.getAttribute("data-theme") === "dark";
+
+    if (settingsThemeSelect) settingsThemeSelect.value = isDark ? "dark" : "light";
+    if (settingsLangSelect) settingsLangSelect.value = settings.lang || "es";
+    if (settingsPromptCards) {
+        settingsPromptCards.checked = settings.showPromptCards !== false;
+    }
+
+    // Personalización
+    if (settingsNickname) settingsNickname.value = settings.nickname || "";
+    if (settingsCustomInstructions) {
+        settingsCustomInstructions.value = settings.instructions || "";
+    }
+
+    // Cuenta
+    if (settingsName) {
+        settingsName.value =
+            savedUser?.name ||
+            userName?.textContent.trim() ||
+            "";
+    }
+
+    if (settingsCurrentPassword) settingsCurrentPassword.value = "";
+    if (settingsNewPassword) settingsNewPassword.value = "";
+
+    settingsBackdrop?.classList.add("active");
+}
+
+function closeSettingsModal() {
+    settingsBackdrop?.classList.remove("active");
+}
+
+closeSettingsBtn?.addEventListener("click", closeSettingsModal);
+
+settingsBackdrop?.addEventListener("click", (event) => {
+    if (event.target === settingsBackdrop) {
+        closeSettingsModal();
+    }
+});
+
+
+/* =========================================================
+   GENERAL
+   ========================================================= */
+
+settingsThemeSelect?.addEventListener("change", () => {
+
+    const wantDark = settingsThemeSelect.value === "dark";
+    const isDark =
+        document.documentElement.getAttribute("data-theme") === "dark";
+
+    if (wantDark !== isDark) {
+        toggleTheme();
+    }
+});
+
+settingsLangSelect?.addEventListener("change", () => {
+    saveSettings({ lang: settingsLangSelect.value });
+    showToast("Idioma guardado (próximamente disponible)");
+});
+
+settingsPromptCards?.addEventListener("change", () => {
+
+    const show = settingsPromptCards.checked;
+
+    saveSettings({ showPromptCards: show });
+
+    const promptGrid = document.querySelector(".prompt-grid");
+
+    if (promptGrid) {
+        promptGrid.style.display = show ? "" : "none";
+    }
+});
+
+
+/* =========================================================
+   PERSONALIZACIÓN
+   ========================================================= */
+
+savePersonalizationBtn?.addEventListener("click", () => {
+
+    saveSettings({
+        nickname: settingsNickname.value.trim(),
+        instructions: settingsCustomInstructions.value.trim()
+    });
+
+    showToast("Personalización guardada");
+});
+
+
+/* =========================================================
+   CUENTA
+   ========================================================= */
+
+settingsNameForm?.addEventListener("submit", async (event) => {
+
+    event.preventDefault();
+
+    const name = settingsName.value.trim();
+
+    if (!name) {
+        showToast("El nombre no puede estar vacío");
+        return;
+    }
+
+    const token = getAuthToken();
+
+    settingsNameBtn.disabled = true;
+
+    try {
+
+        const response = await fetch(
+            `${AUTH_API}/user/name`,
+            {
+                method: "PUT",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ name })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            showToast(data.message || "No se pudo actualizar el nombre");
+            return;
+        }
+
+        if (userName) userName.textContent = data.user.name;
+
+        if (userAvatar) {
+            userAvatar.textContent =
+                (data.user.name || "U").charAt(0).toUpperCase();
+        }
+
+        localStorage.setItem(
+            "nexusai_user",
+            JSON.stringify(data.user)
+        );
+
+        showToast("Nombre actualizado");
+
+    } catch (error) {
+        console.error("Update name error:", error);
+        showToast("No se pudo conectar con el servidor");
+
+    } finally {
+        settingsNameBtn.disabled = false;
+    }
+});
+
+
+settingsPasswordForm?.addEventListener("submit", async (event) => {
+
+    event.preventDefault();
+
+    const currentPassword = settingsCurrentPassword.value;
+    const newPassword = settingsNewPassword.value;
+
+    if (newPassword.length < 8) {
+        showToast("La nueva contraseña debe tener al menos 8 caracteres");
+        return;
+    }
+
+    const token = getAuthToken();
+
+    settingsPasswordBtn.disabled = true;
+
+    try {
+
+        const response = await fetch(
+            `${AUTH_API}/user/password`,
+            {
+                method: "PUT",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ currentPassword, newPassword })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            showToast(data.message || "No se pudo actualizar la contraseña");
+            return;
+        }
+
+        settingsPasswordForm.reset();
+        showToast("Contraseña actualizada");
+
+    } catch (error) {
+        console.error("Update password error:", error);
+        showToast("No se pudo conectar con el servidor");
+
+    } finally {
+        settingsPasswordBtn.disabled = false;
+    }
+});
+
+
+deleteAccountBtn?.addEventListener("click", async () => {
+
+    const confirmed = window.confirm(
+        "¿Seguro que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
+    );
+
+    if (!confirmed) return;
+
+    const token = getAuthToken();
+
+    try {
+
+        const response = await fetch(
+            `${AUTH_API}/user`,
+            {
+                method: "DELETE",
+                credentials: "include",
+                headers: token
+                    ? { Authorization: `Bearer ${token}` }
+                    : {}
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            showToast(data.message || "No se pudo eliminar la cuenta");
+            return;
+        }
+
+        localStorage.removeItem("nexusai_token");
+        localStorage.removeItem("nexusai_user");
+
+        window.location.href = "index.html";
+
+    } catch (error) {
+        console.error("Delete account error:", error);
+        showToast("No se pudo conectar con el servidor");
+    }
+});
+
+
+/* =========================================================
+   DATOS
+   ========================================================= */
+
+exportChatsBtn?.addEventListener("click", () => {
+
+    if (!chats || chats.length === 0) {
+        showToast("No hay conversaciones para exportar");
+        return;
+    }
+
+    const blob = new Blob(
+        [JSON.stringify(chats, null, 2)],
+        { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "nexusai-conversaciones.json";
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+    showToast("Conversaciones exportadas");
+});
+
+deleteAllChatsFromSettingsBtn?.addEventListener("click", () => {
+    closeSettingsModal();
+    openDeleteModal();
+});
+
+
+// --- Cerrar sesión ---
+
+async function handleLogout() {
+
+    const token = getAuthToken();
+
+    try {
+        await fetch(
+            `${AUTH_API}/auth/logout`,
+            {
+                method: "POST",
+                credentials: "include",
+                headers: token
+                    ? { Authorization: `Bearer ${token}` }
+                    : {}
+            }
+        );
+    } catch (error) {
+        console.error("Logout error:", error);
+    }
+
+    localStorage.removeItem("nexusai_token");
+    localStorage.removeItem("nexusai_user");
+
+    window.location.href = "index.html";
+}
+
+
+// --- Aplicar preferencia de tarjetas de inicio al cargar ---
+
+(function applyStoredGeneralSettings() {
+    const settings = getSettings();
+
+    if (settings.showPromptCards === false) {
+        const promptGrid = document.querySelector(".prompt-grid");
+        if (promptGrid) promptGrid.style.display = "none";
+    }
+})();

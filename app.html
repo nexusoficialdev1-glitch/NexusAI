@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
 
     <title>NexusAI — Chat</title>
@@ -23,6 +23,8 @@
     >
 
     <link rel="stylesheet" href="css/app.css">
+
+    
 </head>
 
 <body>
@@ -172,10 +174,29 @@
 
                 <button
                     class="user-more"
+                    id="userMoreBtn"
                     aria-label="Más opciones"
                 >
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
+
+
+                <div
+                    class="user-menu"
+                    id="userMenu"
+                >
+
+                    <button data-action="settings">
+                        <i class="fa-solid fa-gear"></i>
+                        Ajustes
+                    </button>
+
+                    <button data-action="logout" class="danger">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        Cerrar sesión
+                    </button>
+
+                </div>
 
             </div>
 
@@ -584,6 +605,330 @@
             >
                 Borrar todo
             </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     SETTINGS MODAL
+========================================================== -->
+
+<div
+    class="modal-backdrop"
+    id="settingsBackdrop"
+>
+
+    <div
+        class="modal settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settingsModalTitle"
+    >
+
+        <div class="settings-header">
+
+            <h2 id="settingsModalTitle">
+                Ajustes
+            </h2>
+
+            <button
+                type="button"
+                class="settings-close-x"
+                id="closeSettings"
+                aria-label="Cerrar"
+            >
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+        </div>
+
+
+        <div class="settings-body">
+
+            <!-- TABS -->
+
+            <nav class="settings-tabs" id="settingsTabs">
+
+                <button
+                    type="button"
+                    class="settings-tab active"
+                    data-tab="general"
+                >
+                    <i class="fa-solid fa-sliders"></i>
+                    General
+                </button>
+
+                <button
+                    type="button"
+                    class="settings-tab"
+                    data-tab="personalization"
+                >
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    Personalización
+                </button>
+
+                <button
+                    type="button"
+                    class="settings-tab"
+                    data-tab="account"
+                >
+                    <i class="fa-regular fa-user"></i>
+                    Cuenta
+                </button>
+
+                <button
+                    type="button"
+                    class="settings-tab"
+                    data-tab="data"
+                >
+                    <i class="fa-solid fa-database"></i>
+                    Datos
+                </button>
+
+            </nav>
+
+
+            <!-- PANELS -->
+
+            <div class="settings-panels">
+
+
+                <!-- GENERAL -->
+
+                <section class="settings-panel active" data-panel="general">
+
+                    <div class="settings-item">
+
+                        <div class="settings-item-text">
+                            <strong>Tema</strong>
+                            <span>Elige cómo se ve NexusAI en este dispositivo.</span>
+                        </div>
+
+                        <select id="settingsThemeSelect" class="settings-select">
+                            <option value="dark">Oscuro</option>
+                            <option value="light">Claro</option>
+                        </select>
+
+                    </div>
+
+                    <div class="settings-item">
+
+                        <div class="settings-item-text">
+                            <strong>Idioma</strong>
+                            <span>Idioma de la interfaz.</span>
+                        </div>
+
+                        <select id="settingsLangSelect" class="settings-select">
+                            <option value="es">Español</option>
+                            <option value="en">English</option>
+                        </select>
+
+                    </div>
+
+                    <div class="settings-item">
+
+                        <div class="settings-item-text">
+                            <strong>Sugerencias de inicio</strong>
+                            <span>Muestra las tarjetas de ejemplo en la pantalla de bienvenida.</span>
+                        </div>
+
+                        <label class="settings-switch">
+                            <input type="checkbox" id="settingsPromptCards" checked>
+                            <span></span>
+                        </label>
+
+                    </div>
+
+                </section>
+
+
+                <!-- PERSONALIZACIÓN -->
+
+                <section class="settings-panel" data-panel="personalization">
+
+                    <div class="settings-item settings-item-column">
+
+                        <div class="settings-item-text">
+                            <strong>¿Cómo te llamas?</strong>
+                            <span>NexusAI puede usar este nombre al hablarte.</span>
+                        </div>
+
+                        <input
+                            type="text"
+                            id="settingsNickname"
+                            class="settings-input"
+                            placeholder="Ej. Alex"
+                        >
+
+                    </div>
+
+                    <div class="settings-item settings-item-column">
+
+                        <div class="settings-item-text">
+                            <strong>Instrucciones personalizadas</strong>
+                            <span>Dile a NexusAI cómo prefieres que responda (tono, formato, cosas a evitar).</span>
+                        </div>
+
+                        <textarea
+                            id="settingsCustomInstructions"
+                            class="settings-textarea"
+                            rows="4"
+                            maxlength="1500"
+                            placeholder="Ej. Responde siempre de forma breve y directa, usa listas cuando ayude."
+                        ></textarea>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        class="settings-save-btn"
+                        id="savePersonalizationBtn"
+                    >
+                        Guardar
+                    </button>
+
+                </section>
+
+
+                <!-- CUENTA -->
+
+                <section class="settings-panel" data-panel="account">
+
+                    <form class="settings-item settings-item-column" id="settingsNameForm">
+
+                        <div class="settings-item-text">
+                            <strong>Nombre</strong>
+                        </div>
+
+                        <div class="settings-row">
+
+                            <input
+                                type="text"
+                                id="settingsName"
+                                class="settings-input"
+                                autocomplete="name"
+                                required
+                            >
+
+                            <button
+                                type="submit"
+                                class="settings-save-btn"
+                                id="settingsNameBtn"
+                            >
+                                Guardar
+                            </button>
+
+                        </div>
+
+                    </form>
+
+
+                    <form class="settings-item settings-item-column" id="settingsPasswordForm">
+
+                        <div class="settings-item-text">
+                            <strong>Cambiar contraseña</strong>
+                        </div>
+
+                        <input
+                            type="password"
+                            id="settingsCurrentPassword"
+                            class="settings-input"
+                            placeholder="Contraseña actual"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <div class="settings-row">
+
+                            <input
+                                type="password"
+                                id="settingsNewPassword"
+                                class="settings-input"
+                                placeholder="Nueva contraseña (mín. 8 caracteres)"
+                                minlength="8"
+                                autocomplete="new-password"
+                                required
+                            >
+
+                            <button
+                                type="submit"
+                                class="settings-save-btn"
+                                id="settingsPasswordBtn"
+                            >
+                                Guardar
+                            </button>
+
+                        </div>
+
+                    </form>
+
+
+                    <div class="settings-item settings-item-column settings-danger-zone">
+
+                        <div class="settings-item-text">
+                            <strong>Eliminar cuenta</strong>
+                            <span>Esta acción borrará tu cuenta y no se puede deshacer.</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="modal-delete"
+                            id="deleteAccountBtn"
+                        >
+                            Eliminar mi cuenta
+                        </button>
+
+                    </div>
+
+                </section>
+
+
+                <!-- DATOS -->
+
+                <section class="settings-panel" data-panel="data">
+
+                    <div class="settings-item">
+
+                        <div class="settings-item-text">
+                            <strong>Exportar conversaciones</strong>
+                            <span>Descarga todas tus conversaciones en un archivo JSON.</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="settings-save-btn secondary"
+                            id="exportChatsBtn"
+                        >
+                            Exportar
+                        </button>
+
+                    </div>
+
+                    <div class="settings-item settings-danger-zone">
+
+                        <div class="settings-item-text">
+                            <strong>Borrar todas las conversaciones</strong>
+                            <span>Elimina el historial guardado en este navegador.</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="modal-delete"
+                            id="deleteAllChatsFromSettingsBtn"
+                        >
+                            Borrar todo
+                        </button>
+
+                    </div>
+
+                </section>
+
+            </div>
 
         </div>
 
