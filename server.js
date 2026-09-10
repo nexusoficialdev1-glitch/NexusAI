@@ -43,19 +43,231 @@ ollama_client = Client(
 # ============================================================
 
 def get_current_datetime():
+    """
+    Obtiene la fecha y hora actual usando la zona horaria
+    configurada en APP_TIMEZONE.
+    """
     try:
         tz = ZoneInfo(APP_TIMEZONE)
         return datetime.now(tz)
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Error con APP_TIMEZONE ({APP_TIMEZONE}): {e}")
         return datetime.now()
 
 
 def get_current_datetime_text():
+    """
+    Fecha/hora completa en español.
+    """
     now = get_current_datetime()
 
-    return now.strftime(
-        "%A, %B %d, %Y — %H:%M:%S"
+    weekdays = [
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo"
+    ]
+
+    months = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre"
+    ]
+
+    weekday = weekdays[now.weekday()]
+    month = months[now.month - 1]
+
+    return (
+        f"{weekday}, {now.day} de {month} de {now.year} "
+        f"— {now.strftime('%H:%M:%S')}"
     )
+
+
+def get_current_date_text():
+    """
+    Devuelve solamente la fecha actual.
+    """
+    now = get_current_datetime()
+
+    weekdays = [
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo"
+    ]
+
+    months = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre"
+    ]
+
+    return (
+        f"{weekdays[now.weekday()]}, "
+        f"{now.day} de {months[now.month - 1]} de {now.year}"
+    )
+
+
+def get_current_time_text():
+    """
+    Devuelve solamente la hora actual.
+    """
+    now = get_current_datetime()
+
+    return now.strftime("%H:%M:%S")
+
+
+# ============================================================
+# DETECCIÓN DE FECHA / HORA
+# ============================================================
+
+def normalize_text(text):
+    """
+    Normaliza texto para detectar preguntas de fecha/hora.
+    """
+    if not text:
+        return ""
+
+    text = str(text).lower().strip()
+
+    replacements = {
+        "á": "a",
+        "é": "e",
+        "í": "i",
+        "ó": "o",
+        "ú": "u",
+        "ü": "u"
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    text = re.sub(r"\s+", " ", text)
+
+    return text
+
+
+def is_date_question(text):
+    """
+    Detecta preguntas que piden la fecha o el día actual.
+    """
+
+    text = normalize_text(text)
+
+    patterns = [
+        r"\bque dia es hoy\b",
+        r"\bque fecha es hoy\b",
+        r"\bcual es la fecha de hoy\b",
+        r"\bcual es el dia de hoy\b",
+        r"\bfecha de hoy\b",
+        r"\bdia de hoy\b",
+        r"\bfecha actual\b",
+        r"\bdia actual\b",
+        r"\bfecha\b.*\bhoy\b",
+        r"\bhoy\b.*\bfecha\b",
+        r"\bhoy\b.*\bdia\b",
+        r"\bdia\b.*\bhoy\b"
+    ]
+
+    return any(
+        re.search(pattern, text)
+        for pattern in patterns
+    )
+
+
+def is_time_question(text):
+    """
+    Detecta preguntas que piden la hora actual.
+    """
+
+    text = normalize_text(text)
+
+    patterns = [
+        r"\bque hora es\b",
+        r"\bcual es la hora\b",
+        r"\bhora actual\b",
+        r"\bhora de ahora\b",
+        r"\bque hora tenemos\b",
+        r"\bme dices la hora\b",
+        r"\bme puedes decir la hora\b"
+    ]
+
+    return any(
+        re.search(pattern, text)
+        for pattern in patterns
+    )
+
+
+def is_date_time_question(text):
+    """
+    Detecta preguntas de fecha y/o hora.
+    """
+
+    return (
+        is_date_question(text)
+        or
+        is_time_question(text)
+    )
+
+
+# ============================================================
+# RESPUESTA DETERMINISTA DE FECHA / HORA
+# ============================================================
+
+def get_deterministic_datetime_response(user_text):
+    """
+    Responde directamente desde Python.
+
+    Esto evita que el modelo utilice una fecha antigua
+    de su conocimiento interno.
+    """
+
+    date_requested = is_date_question(user_text)
+    time_requested = is_time_question(user_text)
+
+    if date_requested and time_requested:
+        return (
+            f"Hoy es **{get_current_date_text()}** "
+            f"y la hora actual es **{get_current_time_text()}** "
+            f"({APP_TIMEZONE})."
+        )
+
+    if date_requested:
+        return (
+            f"Hoy es **{get_current_date_text()}**."
+        )
+
+    if time_requested:
+        return (
+            f"La hora actual es **{get_current_time_text()}** "
+            f"({APP_TIMEZONE})."
+        )
+
+    return None
 
 
 # ============================================================
@@ -68,54 +280,96 @@ Eres ApexAI, un asistente de inteligencia artificial moderno,
 
 Fuiste creado por Josuexs, un desarrollador venezolano.
 
-FECHA Y HORA ACTUAL:
+============================================================
+FECHA Y HORA ACTUAL
+============================================================
+
+La fecha y hora actual proporcionada por Python es:
+
 {CURRENT_DATETIME}
 
-REGLA FUNDAMENTAL DE INTERNET:
-Los resultados de web_search son la fuente principal para información
-actual, reciente o que pueda haber cambiado.
+Esta información viene directamente del servidor de ApexAI.
 
-IMPORTANTE:
-Python realiza una búsqueda web ANTES de cada mensaje del usuario.
-Los resultados que recibas bajo "RESULTADOS DE WEB_SEARCH OBLIGATORIO"
-deben considerarse contexto externo obtenido de Internet.
+NUNCA sustituyas esta fecha por una fecha antigua de tu memoria.
 
-Cuando los resultados contienen información relevante:
-- Úsalos para responder.
-- No ignores los resultados.
-- No inventes información que contradiga los resultados.
-- Si la información encontrada no es suficiente, dilo claramente.
-- Distingue entre información encontrada en la web y conocimiento general.
+============================================================
+REGLA FUNDAMENTAL DE INTERNET
+============================================================
 
-Si el usuario pregunta por:
+Python ejecuta WEB_SEARCH antes de CADA mensaje del usuario.
+
+Los resultados aparecen bajo:
+
+"RESULTADOS DE WEB_SEARCH OBLIGATORIO"
+
+Estos resultados son información externa obtenida de Internet.
+
+Cuando la pregunta trate sobre información que pueda haber cambiado,
+DEBES dar prioridad a esos resultados.
+
+============================================================
+USO OBLIGATORIO DE LOS RESULTADOS WEB
+============================================================
+
+Si los resultados de WEB_SEARCH contienen información relevante:
+
+1. Úsalos para responder.
+2. No los ignores.
+3. No contradigas los resultados utilizando conocimiento antiguo.
+4. Prioriza información reciente frente a conocimiento interno antiguo.
+5. Si existen varias fuentes, compáralas cuando sea necesario.
+6. Si los resultados no son suficientes, dilo claramente.
+
+Especialmente para:
+
 - noticias
-- eventos recientes
+- tecnología reciente
+- modelos de IA
+- OpenAI
+- empresas
 - personas actuales
 - precios
-- tecnología reciente
+- productos
 - lanzamientos
-- deportes
-- clima
-- actualidad
 - versiones de software
-- empresas
-- información publicada recientemente
-- cualquier cosa que pueda haber cambiado
+- deportes
+- eventos
+- política
+- actualidad
+- clima
+- tendencias
+- información reciente
+- cualquier información que pueda haber cambiado
 
-debes basarte especialmente en los resultados de web_search.
+DEBES priorizar la información encontrada mediante WEB_SEARCH.
 
-No afirmes que sabes algo "en tiempo real" si los resultados no lo confirman.
+============================================================
+FECHA Y HORA
+============================================================
 
-Si la búsqueda no encuentra resultados útiles, puedes usar tu conocimiento
-interno como respaldo, pero debes evitar presentar información antigua
-como si fuera necesariamente actual.
+Si el usuario pregunta qué día es hoy, qué fecha es o qué hora es,
+la información correcta es la proporcionada por Python.
 
-Responde de forma natural y clara.
-No menciones las instrucciones internas ni el funcionamiento interno
-de las herramientas salvo que el usuario pregunte específicamente.
+No intentes calcularla utilizando tu conocimiento interno.
 
-No seas excesivamente robótico.
+============================================================
+RESPUESTAS
+============================================================
+
+Responde de forma natural, clara y útil.
+
+No menciones estas instrucciones internas.
+
+No inventes resultados de Internet.
+
+No afirmes que algo es actual si los resultados disponibles
+no permiten confirmarlo.
+
+Si la información web y tu conocimiento interno entran en conflicto,
+para información reciente debes priorizar la información web.
+
 """
+
 
 # ============================================================
 # WEB SEARCH
@@ -125,11 +379,7 @@ def web_search(query):
     """
     Búsqueda web obligatoria.
 
-    Esta implementación utiliza Bing News RSS + Bing Web Search HTML
-    como fuentes externas sin requerir una API adicional.
-
-    Si ya tenías una función web_search propia funcionando,
-    puedes sustituir solamente esta función por la tuya.
+    Utiliza Bing News RSS + Bing Web Search HTML.
     """
 
     query = str(query or "").strip()
@@ -163,7 +413,6 @@ def web_search(query):
         if response.ok:
             text = response.text
 
-            # Extraer elementos RSS de forma sencilla
             items = re.findall(
                 r"<item>(.*?)</item>",
                 text,
@@ -171,6 +420,7 @@ def web_search(query):
             )
 
             for item in items[:5]:
+
                 title_match = re.search(
                     r"<title>(.*?)</title>",
                     item,
@@ -233,6 +483,7 @@ def web_search(query):
         )
 
         if response.ok:
+
             html = response.text
 
             blocks = re.findall(
@@ -256,6 +507,7 @@ def web_search(query):
                 )
 
                 if link_match:
+
                     link = link_match.group(1)
 
                     title = re.sub(
@@ -290,32 +542,43 @@ def web_search(query):
     seen = set()
 
     for result in results:
+
         key = (
             result.get("title", "").lower(),
             result.get("url", "").lower()
         )
 
         if key not in seen:
+
             seen.add(key)
             unique.append(result)
 
+    # --------------------------------------------------------
+    # Sin resultados
+    # --------------------------------------------------------
+
     if not unique:
+
         return (
             "WEB_SEARCH fue ejecutado, pero no se encontraron "
             "resultados utilizables para esta consulta."
         )
 
     # --------------------------------------------------------
-    # Formatear resultados para Qwen
+    # Formatear resultados
     # --------------------------------------------------------
 
     output = [
         "RESULTADOS DE WEB_SEARCH OBLIGATORIO:",
         f"Consulta: {query}",
+        "",
+        "IMPORTANTE: estos resultados fueron obtenidos "
+        "externamente antes de generar la respuesta.",
         ""
     ]
 
     for index, result in enumerate(unique[:10], start=1):
+
         output.append(
             f"[{index}] {result.get('title', '')}"
         )
@@ -348,6 +611,7 @@ def web_fetch(url):
         return "No se proporcionó una URL."
 
     try:
+
         response = requests.get(
             url,
             timeout=15,
@@ -360,7 +624,6 @@ def web_fetch(url):
 
         text = response.text
 
-        # Quitar scripts/styles
         text = re.sub(
             r"<script.*?</script>",
             " ",
@@ -375,25 +638,25 @@ def web_fetch(url):
             flags=re.DOTALL | re.IGNORECASE
         )
 
-        # Quitar HTML
         text = re.sub(
             r"<[^>]+>",
             " ",
             text
         )
 
-        # Limpiar espacios
         text = re.sub(
             r"\s+",
             " ",
             text
         ).strip()
 
-        # Evitar respuestas gigantes
         return text[:30000]
 
     except Exception as e:
-        return f"No se pudo abrir la página: {e}"
+
+        return (
+            f"No se pudo abrir la página: {e}"
+        )
 
 
 # ============================================================
@@ -408,6 +671,7 @@ def image_search(query):
     query = str(query or "").strip()
 
     if not query:
+
         return {
             "query": query,
             "images": []
@@ -416,6 +680,7 @@ def image_search(query):
     images = []
 
     try:
+
         response = requests.get(
             "https://www.bing.com/images/search",
             params={
@@ -428,6 +693,7 @@ def image_search(query):
         )
 
         if response.ok:
+
             html = response.text
 
             matches = re.findall(
@@ -436,11 +702,15 @@ def image_search(query):
             )
 
             for url in matches[:12]:
+
                 if url not in images:
                     images.append(url)
 
     except Exception as e:
-        print(f"⚠️ Error en image_search: {e}")
+
+        print(
+            f"⚠️ Error en image_search: {e}"
+        )
 
     return {
         "query": query,
@@ -454,13 +724,16 @@ def image_search(query):
 
 def youtube_fetch(url):
     """
-    Obtiene información/transcripción de YouTube usando Supadata
-    si existe SUPADATA_API_KEY.
+    Obtiene información/transcripción de YouTube
+    usando Supadata.
     """
 
-    api_key = os.environ.get("SUPADATA_API_KEY")
+    api_key = os.environ.get(
+        "SUPADATA_API_KEY"
+    )
 
     if not api_key:
+
         return (
             "SUPADATA_API_KEY no está configurada. "
             "No se puede obtener la transcripción de YouTube."
@@ -470,6 +743,7 @@ def youtube_fetch(url):
         return "No se proporcionó una URL de YouTube."
 
     try:
+
         response = requests.get(
             "https://api.supadata.ai/v1/youtube/transcript",
             params={
@@ -482,8 +756,10 @@ def youtube_fetch(url):
         )
 
         if not response.ok:
+
             return (
-                f"Supadata devolvió HTTP {response.status_code}: "
+                f"Supadata devolvió HTTP "
+                f"{response.status_code}: "
                 f"{response.text[:2000]}"
             )
 
@@ -495,7 +771,10 @@ def youtube_fetch(url):
         )[:30000]
 
     except Exception as e:
-        return f"Error obteniendo YouTube: {e}"
+
+        return (
+            f"Error obteniendo YouTube: {e}"
+        )
 
 
 # ============================================================
@@ -511,6 +790,7 @@ available_tools = {
 
 
 tools = [
+
     {
         "type": "function",
         "function": {
@@ -524,13 +804,16 @@ tools = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Consulta que se desea buscar."
+                        "description": (
+                            "Consulta que se desea buscar."
+                        )
                     }
                 },
                 "required": ["query"]
             }
         }
     },
+
     {
         "type": "function",
         "function": {
@@ -544,55 +827,66 @@ tools = [
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "URL de la página."
+                        "description": (
+                            "URL de la página."
+                        )
                     }
                 },
                 "required": ["url"]
             }
         }
     },
+
     {
         "type": "function",
         "function": {
             "name": "image_search",
-            "description": "Busca imágenes relacionadas con una consulta.",
+            "description": (
+                "Busca imágenes relacionadas con una consulta."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Qué imagen se desea buscar."
+                        "description": (
+                            "Qué imagen se desea buscar."
+                        )
                     }
                 },
                 "required": ["query"]
             }
         }
     },
+
     {
         "type": "function",
         "function": {
             "name": "youtube_fetch",
             "description": (
-                "Obtiene información o transcripción de un video "
-                "de YouTube."
+                "Obtiene información o transcripción "
+                "de un video de YouTube."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "URL del video de YouTube."
+                        "description": (
+                            "URL del video."
+                        )
                     }
                 },
                 "required": ["url"]
             }
         }
     }
+
 ]
 
 
 # ============================================================
-# DETECTAR SOLICITUD DE BÚSQUEDA ADICIONAL
+# DETECTAR URL
 # ============================================================
 
 def user_wants_specific_web_page(text):
@@ -620,30 +914,34 @@ def user_wants_specific_web_page(text):
 
 def mandatory_web_search(user_text):
     """
-    ESTA ES LA PARTE IMPORTANTE.
+    Python ejecuta web_search SIEMPRE para cada mensaje.
 
-    La búsqueda NO depende de que Qwen quiera utilizar la herramienta.
-
-    Python llama directamente a web_search para CADA mensaje.
+    Qwen no tiene que decidir si la búsqueda ocurre.
     """
 
     print("🌐 WEB_SEARCH OBLIGATORIO")
     print(f"🔎 Consulta: {user_text}")
 
     try:
-        result = web_search(user_text)
+
+        result = web_search(
+            user_text
+        )
 
         print("✅ WEB_SEARCH terminado.")
 
         return result
 
     except Exception as e:
-        print(f"❌ Error en WEB_SEARCH: {e}")
+
+        print(
+            f"❌ Error en WEB_SEARCH: {e}"
+        )
 
         return (
-            "WEB_SEARCH fue intentado, pero ocurrió un error. "
-            "Puedes responder usando conocimiento interno como respaldo, "
-            "sin afirmar que la información es actual."
+            "WEB_SEARCH fue intentado, pero ocurrió un error.\n"
+            f"Error: {e}\n\n"
+            "No utilices información inventada como si fuera actual."
         )
 
 
@@ -652,6 +950,7 @@ def mandatory_web_search(user_text):
 # ============================================================
 
 def build_messages(user_message, history=None):
+
     current_datetime = get_current_datetime_text()
 
     system_prompt = SYSTEM_PROMPT.replace(
@@ -666,7 +965,10 @@ def build_messages(user_message, history=None):
         }
     ]
 
-    # Mantener historial
+    # ========================================================
+    # HISTORIAL
+    # ========================================================
+
     if history and isinstance(history, list):
 
         for message in history[-20:]:
@@ -677,7 +979,10 @@ def build_messages(user_message, history=None):
             role = message.get("role")
             content = message.get("content")
 
-            if role not in ("user", "assistant"):
+            if role not in (
+                "user",
+                "assistant"
+            ):
                 continue
 
             if not content:
@@ -689,21 +994,36 @@ def build_messages(user_message, history=None):
             })
 
     # ========================================================
-    # WEB SEARCH SIEMPRE
+    # WEB SEARCH OBLIGATORIO
     # ========================================================
 
-    web_results = mandatory_web_search(user_message)
+    web_results = mandatory_web_search(
+        user_message
+    )
 
     messages.append({
         "role": "system",
         "content": (
-            "IMPORTANTE: Antes de responder, se ejecutó "
-            "WEB_SEARCH de forma obligatoria para esta consulta.\n\n"
+            "====================================================\n"
+            "WEB_SEARCH OBLIGATORIO — RESULTADOS EXTERNOS\n"
+            "====================================================\n\n"
+            "La siguiente información fue obtenida mediante "
+            "una búsqueda web ejecutada automáticamente "
+            "antes de responder al usuario.\n\n"
+            "DEBES PRIORIZAR estos resultados cuando sean "
+            "relevantes para la pregunta.\n\n"
             + web_results
+            + "\n\n"
+            "====================================================\n"
+            "FIN DE LOS RESULTADOS WEB\n"
+            "===================================================="
         )
     })
 
-    # Pregunta actual
+    # ========================================================
+    # PREGUNTA ACTUAL
+    # ========================================================
+
     messages.append({
         "role": "user",
         "content": user_message
@@ -718,16 +1038,42 @@ def build_messages(user_message, history=None):
 
 def run_agent(user_message, history=None):
 
+    # ========================================================
+    # SIEMPRE HACEMOS WEB SEARCH
+    # ========================================================
+
     messages = build_messages(
         user_message,
         history
     )
 
-    final_text = ""
+    # ========================================================
+    # FECHA / HORA: RESPUESTA DIRECTA DE PYTHON
+    # ========================================================
+
+    deterministic_response = (
+        get_deterministic_datetime_response(
+            user_message
+        )
+    )
+
+    if deterministic_response:
+
+        print(
+            "🕐 Pregunta de fecha/hora detectada."
+        )
+
+        print(
+            "✅ Respuesta generada directamente por Python."
+        )
+
+        return deterministic_response
 
     # ========================================================
-    # PRIMERA RESPUESTA
+    # PRIMERA RESPUESTA DE QWEN
     # ========================================================
+
+    final_text = ""
 
     try:
 
@@ -743,10 +1089,13 @@ def run_agent(user_message, history=None):
 
     except Exception as e:
 
-        print(f"❌ Error Ollama: {e}")
+        print(
+            f"❌ Error Ollama: {e}"
+        )
 
         return (
-            "Hubo un problema al conectar con el modelo de IA: "
+            "Hubo un problema al conectar con "
+            "el modelo de IA: "
             f"{str(e)}"
         )
 
@@ -760,8 +1109,9 @@ def run_agent(user_message, history=None):
 
         assistant_message = response.message
 
-        # Guardar respuesta del asistente
-        messages.append(assistant_message)
+        messages.append(
+            assistant_message
+        )
 
         content = getattr(
             assistant_message,
@@ -782,57 +1132,81 @@ def run_agent(user_message, history=None):
             break
 
         print(
-            f"🛠️ Qwen solicitó {len(tool_calls)} herramienta(s)"
+            f"🛠️ Qwen solicitó "
+            f"{len(tool_calls)} herramienta(s)"
         )
 
         for tool_call in tool_calls:
 
+            function_name = "unknown"
+
             try:
 
-                function_name = tool_call.function.name
-                arguments = tool_call.function.arguments
+                function_name = (
+                    tool_call.function.name
+                )
+
+                arguments = (
+                    tool_call.function.arguments
+                )
 
                 print(
                     f"🔧 Ejecutando herramienta: "
                     f"{function_name}"
                 )
 
-                function_to_call = available_tools.get(
-                    function_name
+                function_to_call = (
+                    available_tools.get(
+                        function_name
+                    )
                 )
 
                 if not function_to_call:
 
                     result = (
-                        f"La herramienta '{function_name}' "
+                        f"La herramienta "
+                        f"'{function_name}' "
                         "no existe."
                     )
 
                 else:
 
-                    if isinstance(arguments, str):
-                        arguments = json.loads(arguments)
+                    if isinstance(
+                        arguments,
+                        str
+                    ):
+                        arguments = json.loads(
+                            arguments
+                        )
 
                     result = function_to_call(
                         **arguments
                     )
 
-                if isinstance(result, (dict, list)):
+                if isinstance(
+                    result,
+                    (dict, list)
+                ):
+
                     result_text = json.dumps(
                         result,
                         ensure_ascii=False
                     )
+
                 else:
+
                     result_text = str(result)
 
             except Exception as e:
 
                 print(
-                    f"❌ Error ejecutando herramienta: {e}"
+                    f"❌ Error ejecutando "
+                    f"herramienta: {e}"
                 )
 
                 result_text = (
-                    f"Error ejecutando la herramienta: {e}"
+                    "Error ejecutando "
+                    f"la herramienta: {e}"
                 )
 
             messages.append({
@@ -842,7 +1216,7 @@ def run_agent(user_message, history=None):
             })
 
         # ====================================================
-        # PEDIRLE AL MODELO QUE CONTINÚE
+        # CONTINUAR CON QWEN
         # ====================================================
 
         try:
@@ -860,7 +1234,8 @@ def run_agent(user_message, history=None):
         except Exception as e:
 
             print(
-                f"❌ Error en segunda llamada Ollama: {e}"
+                "❌ Error en segunda "
+                f"llamada Ollama: {e}"
             )
 
             break
@@ -872,7 +1247,8 @@ def run_agent(user_message, history=None):
     if not final_text:
 
         final_text = (
-            "No pude generar una respuesta en este momento."
+            "No pude generar una respuesta "
+            "en este momento."
         )
 
     return final_text
@@ -882,7 +1258,10 @@ def run_agent(user_message, history=None):
 # API CHAT
 # ============================================================
 
-@app.route("/api/chat", methods=["POST"])
+@app.route(
+    "/api/chat",
+    methods=["POST"]
+)
 def chat():
 
     try:
@@ -920,7 +1299,9 @@ def chat():
         return jsonify({
             "response": answer,
             "model": MODEL_NAME,
-            "web_search_used": True
+            "web_search_used": True,
+            "server_datetime": get_current_datetime_text(),
+            "timezone": APP_TIMEZONE
         })
 
     except Exception as e:
@@ -938,7 +1319,10 @@ def chat():
 # HEALTH CHECK
 # ============================================================
 
-@app.route("/api/health", methods=["GET"])
+@app.route(
+    "/api/health",
+    methods=["GET"]
+)
 def health():
 
     return jsonify({
@@ -955,13 +1339,17 @@ def health():
 # ROOT
 # ============================================================
 
-@app.route("/", methods=["GET"])
+@app.route(
+    "/",
+    methods=["GET"]
+)
 def index():
 
     return jsonify({
         "service": "ApexAI",
         "status": "online",
-        "web_search": "mandatory"
+        "web_search": "mandatory",
+        "datetime": get_current_datetime_text()
     })
 
 
