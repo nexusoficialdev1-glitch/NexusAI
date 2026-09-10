@@ -1,5 +1,34 @@
 const API_URL = "https://nexus-ai-api-iwqr.onrender.com/api";
 
+// Procesar autenticación OAuth (GitHub)
+(function handleOAuthCallback() {
+    const params = new URLSearchParams(window.location.search);
+
+    const token = params.get("token");
+    const user = params.get("user");
+
+    if (!token) return;
+
+    try {
+        localStorage.setItem("nexusai_token", token);
+
+        if (user) {
+            const userData = JSON.parse(decodeURIComponent(user));
+            localStorage.setItem("nexusai_user", JSON.stringify(userData));
+        }
+
+        window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+        );
+
+        window.location.href = "app.html";
+    } catch (error) {
+        console.error("Error procesando OAuth:", error);
+    }
+})();
+
 
 /*
 =========================================
