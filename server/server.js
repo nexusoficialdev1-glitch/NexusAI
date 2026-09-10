@@ -559,7 +559,7 @@ app.get(
 );
 
 res.redirect(
-    `${FRONTEND_URL}/app.html?user=${userData}`
+    `${FRONTEND_URL}/app.html?token=${token}&user=${userData}`
 );
 
         } catch (error) {
@@ -582,15 +582,21 @@ res.redirect(
 
 app.get("/api/auth/me", (req, res) => {
     try {
-        const token = req.cookies.nexusai_token;
+        const authHeader = req.headers.authorization || "";
 
-        // No llegó la cookie
+        const bearerToken = authHeader.startsWith("Bearer ")
+            ? authHeader.slice(7)
+            : null;
+
+        const token = req.cookies.nexusai_token || bearerToken;
+
+        // No llegó ni cookie ni Authorization
         if (!token) {
-            console.log("❌ /auth/me: no llegó nexusai_token");
+            console.log("❌ /auth/me: no llegó token (ni cookie ni Bearer)");
 
             return res.status(401).json({
                 success: false,
-                message: "No llegó la cookie de sesión."
+                message: "No se encontró sesión."
             });
         }
 
