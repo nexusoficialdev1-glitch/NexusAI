@@ -31,7 +31,7 @@ CORS(app)
 # CONFIGURACIÓN OLLAMA CLOUD
 # ============================================================
 
-MODEL_NAME = "gpt-oss:20b-cloud"
+MODEL_NAME = "qwen3.8-flash-next"
 
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "").strip()
 
